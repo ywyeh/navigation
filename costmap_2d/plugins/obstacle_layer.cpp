@@ -531,52 +531,79 @@ void ObstacleLayer::raytraceFreespace(const Observation& clearing_observation, d
     double wx = *iter_x;
     double wy = *iter_y;
 
-    // now we also need to make sure that the enpoint we're raytracing
-    // to isn't off the costmap and scale if necessary
-    double a = wx - ox;
-    double b = wy - oy;
+    // add 6*6 point around the (wx,wy)
+    double dx = 0.01;
+    double dy = 0.01;
+    std::vector<std::pair<double,double>> inflate_pts;
+    inflate_pts.push_back(std::make_pair(wx +  0, wy +  0));
 
-    // the minimum value to raytrace from is the origin
-    if (wx < origin_x)
+    inflate_pts.push_back(std::make_pair(wx +  0, wy - dy));
+    inflate_pts.push_back(std::make_pair(wx - dx, wy +  0));
+    inflate_pts.push_back(std::make_pair(wx +  0, wy + dy));
+    inflate_pts.push_back(std::make_pair(wx + dx, wy +  0));
+
+    inflate_pts.push_back(std::make_pair(wx +    0, wy - 2*dy));
+    inflate_pts.push_back(std::make_pair(wx - 2*dx, wy +    0));
+    inflate_pts.push_back(std::make_pair(wx +    0, wy + 2*dy));
+    inflate_pts.push_back(std::make_pair(wx + 2*dx, wy +    0));
+
+    inflate_pts.push_back(std::make_pair(wx +    0, wy - 3*dy));
+    inflate_pts.push_back(std::make_pair(wx - 3*dx, wy +    0));
+    inflate_pts.push_back(std::make_pair(wx +    0, wy + 3*dy));
+    inflate_pts.push_back(std::make_pair(wx + 3*dx, wy +    0));
+
+    for(auto pt : inflate_pts)
     {
-      double t = (origin_x - ox) / a;
-      wx = origin_x;
-      wy = oy + b * t;
+      wx = pt.first;
+      wy = pt.second;
+
+      // now we also need to make sure that the enpoint we're raytracing
+      // to isn't off the costmap and scale if necessary
+      double a = wx - ox;
+      double b = wy - oy;
+
+      // the minimum value to raytrace from is the origin
+      if (wx < origin_x)
+      {
+        double t = (origin_x - ox) / a;
+        wx = origin_x;
+        wy = oy + b * t;
+      }
+      if (wy < origin_y)
+      {
+        double t = (origin_y - oy) / b;
+        wx = ox + a * t;
+        wy = origin_y;
+      }
+
+      // the maximum value to raytrace to is the end of the map
+      if (wx > map_end_x)
+      {
+        double t = (map_end_x - ox) / a;
+        wx = map_end_x - .001;
+        wy = oy + b * t;
+      }
+      if (wy > map_end_y)
+      {
+        double t = (map_end_y - oy) / b;
+        wx = ox + a * t;
+        wy = map_end_y - .001;
+      }
+
+      // now that the vector is scaled correctly... we'll get the map coordinates of its endpoint
+      unsigned int x1, y1;
+
+      // check for legality just in case
+      if (!worldToMap(wx, wy, x1, y1))
+        continue;
+
+      unsigned int cell_raytrace_range = cellDistance(clearing_observation.raytrace_range_);
+      MarkCell marker(costmap_, FREE_SPACE);
+      // and finally... we can execute our trace to clear obstacles along that line
+      raytraceLine(marker, x0, y0, x1, y1, cell_raytrace_range);
+
+      updateRaytraceBounds(ox, oy, wx, wy, clearing_observation.raytrace_range_, min_x, min_y, max_x, max_y);
     }
-    if (wy < origin_y)
-    {
-      double t = (origin_y - oy) / b;
-      wx = ox + a * t;
-      wy = origin_y;
-    }
-
-    // the maximum value to raytrace to is the end of the map
-    if (wx > map_end_x)
-    {
-      double t = (map_end_x - ox) / a;
-      wx = map_end_x - .001;
-      wy = oy + b * t;
-    }
-    if (wy > map_end_y)
-    {
-      double t = (map_end_y - oy) / b;
-      wx = ox + a * t;
-      wy = map_end_y - .001;
-    }
-
-    // now that the vector is scaled correctly... we'll get the map coordinates of its endpoint
-    unsigned int x1, y1;
-
-    // check for legality just in case
-    if (!worldToMap(wx, wy, x1, y1))
-      continue;
-
-    unsigned int cell_raytrace_range = cellDistance(clearing_observation.raytrace_range_);
-    MarkCell marker(costmap_, FREE_SPACE);
-    // and finally... we can execute our trace to clear obstacles along that line
-    raytraceLine(marker, x0, y0, x1, y1, cell_raytrace_range);
-
-    updateRaytraceBounds(ox, oy, wx, wy, clearing_observation.raytrace_range_, min_x, min_y, max_x, max_y);
   }
 }
 
