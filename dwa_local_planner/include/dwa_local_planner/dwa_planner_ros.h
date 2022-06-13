@@ -57,6 +57,10 @@
 
 #include <dwa_local_planner/dwa_planner.h>
 
+// controller period
+#include <std_msgs/Float64.h>
+#include <time.h>
+
 namespace dwa_local_planner {
   /**
    * @class DWAPlannerROS
@@ -134,6 +138,9 @@ namespace dwa_local_planner {
 
       // for visualisation, publishers of global and local plan
       ros::Publisher g_plan_pub_, l_plan_pub_;
+
+      // for controller period monitor
+      ros::Publisher controller_period_pub_;
 
       base_local_planner::LocalPlannerUtil planner_util_;
 

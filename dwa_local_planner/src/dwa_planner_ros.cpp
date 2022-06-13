@@ -99,7 +99,10 @@ namespace dwa_local_planner {
       tf2_ros::Buffer* tf,
       costmap_2d::Costmap2DROS* costmap_ros) {
     if (! isInitialized()) {
-
+      // for controllor period
+      ros::NodeHandle nh;
+      controller_period_pub_ = nh.advertise<std_msgs::Float64>("controller_period", 1);
+      
       ros::NodeHandle private_nh("~/" + name);
       g_plan_pub_ = private_nh.advertise<nav_msgs::Path>("global_plan", 1);
       l_plan_pub_ = private_nh.advertise<nav_msgs::Path>("local_plan", 1);
@@ -262,6 +265,10 @@ namespace dwa_local_planner {
 
 
   bool DWAPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
+    // for calculate time cost
+    struct timespec tt1;
+    clock_gettime(CLOCK_REALTIME, &tt1);
+
     // dispatches to either dwa sampling control or stop and rotate control, depending on whether we have been close enough to goal
     if ( ! costmap_ros_->getRobotPose(current_pose_)) {
       ROS_ERROR("Could not get robot pose");
@@ -307,6 +314,18 @@ namespace dwa_local_planner {
         std::vector<geometry_msgs::PoseStamped> empty_plan;
         publishGlobalPlan(empty_plan);
       }
+      // get time now for calculate controller period
+      struct timespec tt2;
+      clock_gettime(CLOCK_REALTIME, &tt2);
+        
+      // calculate time period
+      double period = (tt2.tv_sec - tt1.tv_sec) + (tt2.tv_nsec - tt1.tv_nsec)/1.0e9;
+
+      // publish controller period
+      std_msgs::Float64 dt;
+      dt.data = period;
+      controller_period_pub_.publish(dt);
+      
       return isOk;
     }
   }
